@@ -25,7 +25,7 @@ pipeline {
         stage('Run Tests (Non-Blocking)') {
             steps {
                 sh '''
-                echo "⚠️ Running tests (non-blocking DevOps mode)"
+                echo "⚠️ Running tests in non-blocking DevOps mode"
 
                 docker run --rm \
                   -e CI=true \
@@ -37,7 +37,7 @@ pipeline {
                     npm test -- --watch=false --runInBand || true
                   "
 
-                echo "⚠️ Test failures ignored as per DevOps pipeline design"
+                echo "⚠️ Test failures ignored to allow CI/CD flow"
                 '''
             }
         }
@@ -90,12 +90,29 @@ pipeline {
             }
         }
 
-        stage('Deploy to EKS using Ansible') {
+        stage('Deploy to STAGING') {
             steps {
                 sh '''
                 ssh -o StrictHostKeyChecking=no ${ANSIBLE_HOST} "
                   cd ~/ansible-bms/playbooks &&
-                  ansible-playbook deploy.yml --extra-vars image_tag=${IMAGE_TAG} || true
+                  ansible-playbook deploy-staging.yml --extra-vars image_tag=${IMAGE_TAG}
+                "
+                '''
+            }
+        }
+
+        stage('Approval for PRODUCTION') {
+            steps {
+                input message: 'Approve deployment to PRODUCTION?', ok: 'Deploy'
+            }
+        }
+
+        stage('Deploy to PRODUCTION') {
+            steps {
+                sh '''
+                ssh -o StrictHostKeyChecking=no ${ANSIBLE_HOST} "
+                  cd ~/ansible-bms/playbooks &&
+                  ansible-playbook deploy-production.yml --extra-vars image_tag=${IMAGE_TAG}
                 "
                 '''
             }
