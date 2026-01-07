@@ -49,7 +49,7 @@ pipeline {
             steps {
                 sh '''
                 ssh -o StrictHostKeyChecking=no ${ANSIBLE_HOST} \
-                "cd ~/ansible-bms/playbooks && ansible-playbook deploy-bms.yaml \
+                "cd ~/ansible-bms/playbooks && ansible-playbook deploy.yaml \
                 --extra-vars image_tag=${IMAGE_TAG}"
                 '''
             }
