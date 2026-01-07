@@ -5,7 +5,7 @@ pipeline {
         AWS_REGION = "us-east-1"
         ECR_REPO = "424192958702.dkr.ecr.us-east-1.amazonaws.com/bms-app"
         IMAGE_TAG = "${BUILD_NUMBER}"
-        ANSIBLE_HOST = "ubuntu@<ANSIBLE_EC2_PRIVATE_IP>"
+        ANSIBLE_HOST = "ubuntu@10.0.1.9"
     }
 
     stages {
