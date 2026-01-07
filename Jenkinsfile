@@ -3,7 +3,6 @@ pipeline {
 
     environment {
         AWS_REGION = "us-east-1"
-        ECR_REGISTRY = "424192958702.dkr.ecr.us-east-1.amazonaws.com"
         ECR_REPO = "424192958702.dkr.ecr.us-east-1.amazonaws.com/bms-app"
         IMAGE_TAG = "${BUILD_NUMBER}"
         ANSIBLE_HOST = "ubuntu@10.0.1.9"
@@ -36,7 +35,7 @@ pipeline {
                   echo "<html><body>
                   <h1>BookMyShow Test Report</h1>
                   <p>Automated tests executed successfully.</p>
-                  </body></html>" > test-report/index.html
+                  </body></html>" > ${WORKSPACE}/test-report/index.html
                 '''
             }
         }
@@ -45,8 +44,8 @@ pipeline {
             steps {
                 dir('bookmyshow-app') {
                     sh '''
-                      docker build -t bms-app:${IMAGE_TAG} .
-                      docker tag bms-app:${IMAGE_TAG} ${ECR_REPO}:${IMAGE_TAG}
+                    docker build -t bms-app:${IMAGE_TAG} .
+                    docker tag bms-app:${IMAGE_TAG} ${ECR_REPO}:${IMAGE_TAG}
                     '''
                 }
             }
@@ -55,8 +54,8 @@ pipeline {
         stage('Login to AWS ECR') {
             steps {
                 sh '''
-                  aws ecr get-login-password --region ${AWS_REGION} \
-                  | docker login --username AWS --password-stdin ${ECR_REGISTRY}
+                aws ecr get-login-password --region ${AWS_REGION} \
+                | docker login --username AWS --password-stdin ${ECR_REPO}
                 '''
             }
         }
@@ -64,7 +63,7 @@ pipeline {
         stage('Push Image to ECR') {
             steps {
                 sh '''
-                  docker push ${ECR_REPO}:${IMAGE_TAG}
+                docker push ${ECR_REPO}:${IMAGE_TAG}
                 '''
             }
         }
@@ -72,10 +71,9 @@ pipeline {
         stage('Trigger Ansible Deployment') {
             steps {
                 sh '''
-                  ssh -o StrictHostKeyChecking=no ${ANSIBLE_HOST} \
-                  "cd ~/ansible-bms/playbooks && \
-                   ansible-playbook deploy.yml \
-                   --extra-vars image_tag=${IMAGE_TAG}"
+                ssh -o StrictHostKeyChecking=no ${ANSIBLE_HOST} \
+                "cd ~/ansible-bms/playbooks && ansible-playbook deploy.yml \
+                --extra-vars image_tag=${IMAGE_TAG}"
                 '''
             }
         }
