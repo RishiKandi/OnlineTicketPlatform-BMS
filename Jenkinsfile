@@ -18,12 +18,15 @@ pipeline {
             }
         }
 
-        stage('Install & Run Tests') {
+        stage('Install & Run Tests (Dockerized Node)') {
             steps {
                 dir('bookmyshow-app') {
                     sh '''
-                      npm install --legacy-peer-deps
-                      npm test -- --watch=false || true
+                      docker run --rm \
+                        -v "$PWD":/app \
+                        -w /app \
+                        node:18 \
+                        bash -c "npm install --legacy-peer-deps && npm test -- --watch=false || true"
                     '''
                 }
             }
@@ -32,25 +35,17 @@ pipeline {
         stage('Generate Test Report') {
             steps {
                 sh '''
-                  echo "Workspace: $WORKSPACE"
-
-                  mkdir -p "$WORKSPACE/test-report"
-
-                  cat <<EOF > "$WORKSPACE/test-report/index.html"
+                  mkdir -p test-report
+                  cat <<EOF > test-report/index.html
                   <html>
-                    <head>
-                      <title>BookMyShow Test Report</title>
-                    </head>
                     <body>
-                      <h1>BookMyShow CI Test Report</h1>
-                      <p><b>Build Number:</b> ${BUILD_NUMBER}</p>
-                      <p><b>Status:</b> Tests Executed</p>
-                      <p><b>Date:</b> $(date)</p>
+                      <h1>BookMyShow Test Report</h1>
+                      <p>Build Number: ${BUILD_NUMBER}</p>
+                      <p>Status: Tests Executed</p>
+                      <p>Date: $(date)</p>
                     </body>
                   </html>
                   EOF
-
-                  ls -l "$WORKSPACE/test-report"
                 '''
             }
         }
