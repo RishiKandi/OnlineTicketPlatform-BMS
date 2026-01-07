@@ -4,21 +4,22 @@ pipeline {
     options {
         disableConcurrentBuilds()
         timeout(time: 30, unit: 'MINUTES')
+        timestamps()
     }
 
     environment {
         AWS_REGION   = "us-east-1"
-        ECR_REPO     = "424192958702.dkr.ecr.us-east-1.amazonaws.com/bms-app"
+        ECR_REGISTRY = "424192958702.dkr.ecr.us-east-1.amazonaws.com"
+        ECR_REPO     = "bms-app"
         IMAGE_TAG    = "${BUILD_NUMBER}"
         ANSIBLE_HOST = "ubuntu@10.0.1.9"
     }
 
     stages {
 
-        stage('Checkout Code') {
+        stage('Checkout Source Code') {
             steps {
-                git branch: 'main',
-                    url: 'https://github.com/RishiKandi/OnlineTicketPlatform-BMS.git'
+                checkout scm
             }
         }
 
@@ -29,7 +30,7 @@ pipeline {
 
                 docker run --rm \
                   -e CI=true \
-                  -v $WORKSPACE/bookmyshow-app:/app \
+                  -v "$WORKSPACE/bookmyshow-app:/app" \
                   -w /app \
                   node:18 \
                   sh -c "
@@ -37,7 +38,7 @@ pipeline {
                     npm test -- --watch=false --runInBand || true
                   "
 
-                echo "⚠️ Test failures ignored to allow CI/CD flow"
+                echo "⚠️ Test failures ignored as per pipeline design"
                 '''
             }
         }
@@ -51,8 +52,9 @@ pipeline {
                   <head><title>BookMyShow Test Report</title></head>
                   <body>
                     <h1>BookMyShow CI Test Report</h1>
-                    <p>React tests executed in CI mode.</p>
-                    <p>Known Redux test issues ignored.</p>
+                    <p>Framework: React (Jest)</p>
+                    <p>Execution Mode: Non-blocking</p>
+                    <p>Known Redux test issues intentionally ignored</p>
                     <p>Build Number: ${BUILD_NUMBER}</p>
                     <p>Status: Pipeline Continued</p>
                   </body>
@@ -66,18 +68,18 @@ pipeline {
             steps {
                 dir('bookmyshow-app') {
                     sh '''
-                    docker build -t bms-app:${IMAGE_TAG} .
-                    docker tag bms-app:${IMAGE_TAG} ${ECR_REPO}:${IMAGE_TAG}
+                    docker build -t ${ECR_REPO}:${IMAGE_TAG} .
+                    docker tag ${ECR_REPO}:${IMAGE_TAG} ${ECR_REGISTRY}/${ECR_REPO}:${IMAGE_TAG}
                     '''
                 }
             }
         }
 
-        stage('Login to AWS ECR') {
+        stage('Login to Amazon ECR') {
             steps {
                 sh '''
                 aws ecr get-login-password --region ${AWS_REGION} \
-                | docker login --username AWS --password-stdin 424192958702.dkr.ecr.us-east-1.amazonaws.com
+                | docker login --username AWS --password-stdin ${ECR_REGISTRY}
                 '''
             }
         }
@@ -85,34 +87,36 @@ pipeline {
         stage('Push Image to ECR') {
             steps {
                 sh '''
-                docker push ${ECR_REPO}:${IMAGE_TAG}
+                docker push ${ECR_REGISTRY}/${ECR_REPO}:${IMAGE_TAG}
                 '''
             }
         }
 
-        stage('Deploy to STAGING') {
+        stage('Deploy to STAGING (Ansible + EKS)') {
             steps {
                 sh '''
                 ssh -o StrictHostKeyChecking=no ${ANSIBLE_HOST} "
                   cd ~/ansible-bms/playbooks &&
-                  ansible-playbook deploy-staging.yml --extra-vars image_tag=${IMAGE_TAG}
+                  ansible-playbook deploy-staging.yml \
+                    --extra-vars image_tag=${IMAGE_TAG}
                 "
                 '''
             }
         }
 
-        stage('Approval for PRODUCTION') {
+        stage('Manual Approval for PRODUCTION') {
             steps {
                 input message: 'Approve deployment to PRODUCTION?', ok: 'Deploy'
             }
         }
 
-        stage('Deploy to PRODUCTION') {
+        stage('Deploy to PRODUCTION (Ansible + EKS)') {
             steps {
                 sh '''
                 ssh -o StrictHostKeyChecking=no ${ANSIBLE_HOST} "
                   cd ~/ansible-bms/playbooks &&
-                  ansible-playbook deploy-production.yml --extra-vars image_tag=${IMAGE_TAG}
+                  ansible-playbook deploy-production.yml \
+                    --extra-vars image_tag=${IMAGE_TAG}
                 "
                 '''
             }
