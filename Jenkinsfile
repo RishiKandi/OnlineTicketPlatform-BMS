@@ -32,7 +32,7 @@ pipeline {
         stage('Generate Test Report') {
             steps {
                 sh '''
-                  mkdir -p test-report
+                  mkdir -p ${WORKSPACE}/test-report
                   echo "<html><body>
                   <h1>BookMyShow Test Report</h1>
                   <p>Automated tests executed successfully.</p>
